@@ -221,7 +221,7 @@ class CardiaNetQAT(nn.Module):
         x = torch.cat([x, rr], dim=1)
         x = self._fq(self.obs_fused, x)
 
-        x = F.linear(x, self._fqw(n.fc1.weight, False), n.fc1.bias)
+        x = F.linear(n.drop(x), self._fqw(n.fc1.weight, False), n.fc1.bias)
         x = self._fq(self.obs_fc1, F.relu(x))
 
         # No observer on the logits: the firmware keeps the final layer's int32

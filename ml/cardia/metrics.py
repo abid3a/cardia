@@ -35,9 +35,19 @@ def per_class(cm: np.ndarray) -> dict[str, dict[str, float]]:
         fp = float(cm[:, i].sum() - tp)
         tn = float(total - tp - fn - fp)
         sens = tp / (tp + fn) if (tp + fn) > 0 else float("nan")
+        # PPV is genuinely undefined when the class was never predicted, and is
+        # displayed as such -- but F1 must NOT inherit that undefinedness.
         ppv = tp / (tp + fp) if (tp + fp) > 0 else float("nan")
         spec = tn / (tn + fp) if (tn + fp) > 0 else float("nan")
-        f1 = (2 * sens * ppv / (sens + ppv)) if (sens + ppv) > 0 else float("nan")
+        # Algebraic form of F1, 2TP / (2TP + FP + FN). Equivalent to the
+        # harmonic mean of sensitivity and PPV whenever both are defined, but
+        # correctly yields 0 -- not NaN -- when the model never predicts the
+        # class at all. Computing F1 from sens/ppv instead lets a NaN escape,
+        # and a NaN dropped from a macro average silently REWARDS ignoring a
+        # class: a model that never once predicts S scores as if S did not
+        # exist. That is exactly the failure this project is about avoiding.
+        denom = 2 * tp + fp + fn
+        f1 = (2 * tp / denom) if denom > 0 else float("nan")
         out[name] = {
             "support": int(tp + fn),
             "tp": int(tp), "fp": int(fp), "fn": int(fn),
@@ -54,20 +64,33 @@ def summarize(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
     # Macro averages over N/S/V/F only. Q is excluded because after removing
     # the paced records it has ~7 beats in the whole test set: including it
     # would let a couple of coin flips swing the headline number by points.
-    keys = ["N", "S", "V", "F"]
-    def macro(metric: str) -> float:
-        vals = [pc[k][metric] for k in keys if pc[k]["support"] > 0
-                and not np.isnan(pc[k][metric])]
+    def macro(metric: str, keys: list[str]) -> float:
+        # Every class that OCCURS is included. A class with support that the
+        # model never predicts contributes its (zero) F1, it does not vanish.
+        vals = []
+        for k in keys:
+            if pc[k]["support"] == 0:
+                continue
+            v = pc[k][metric]
+            vals.append(0.0 if np.isnan(v) else v)
         return float(np.mean(vals)) if vals else float("nan")
 
+    nsvf = ["N", "S", "V", "F"]
     return {
         "accuracy": acc,
         "n_beats": int(len(y_true)),
         "confusion_matrix": cm.tolist(),
         "per_class": pc,
-        "macro_sensitivity": macro("sensitivity"),
-        "macro_ppv": macro("ppv"),
-        "macro_f1": macro("f1"),
+        "macro_sensitivity": macro("sensitivity", nsvf),
+        "macro_ppv": macro("ppv", nsvf),
+        "macro_f1": macro("f1", nsvf),
+        # Selection metric. F is excluded here and only here: it is 0.8% of
+        # MIT-BIH and 90% of DS1's fusion beats live in a single record, so any
+        # patient-disjoint validation split has either almost no F beats or
+        # almost no F training data. Including a 17-beat class in the epoch
+        # selection criterion adds noise, not signal. F is still reported in
+        # full for the final DS2 evaluation.
+        "macro_f1_nsv": macro("f1", ["N", "S", "V"]),
     }
 
 

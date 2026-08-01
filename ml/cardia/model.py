@@ -48,6 +48,7 @@ L2P = L2 // 2                                        # 16
 L3 = (L2P + 2 * C3_P - C3_K) // C3_S + 1             # 16
 
 FUSED_IN = C3_OUT + cfg.N_RR_FEATURES                # 36
+DROPOUT_P = 0.3
 
 
 def mac_count() -> dict[str, int]:
@@ -100,6 +101,14 @@ class CardiaNet(nn.Module):
         self.bn3 = nn.BatchNorm1d(C3_OUT)
         self.fc1 = nn.Linear(FUSED_IN, FC1_OUT)
         self.fc2 = nn.Linear(FC1_OUT, cfg.N_CLASSES)
+        # Dropout only on the fused feature vector, and only during training.
+        # Inter-patient generalisation is this project's whole difficulty: the
+        # model fits DS1's 17 patients to a training loss of ~0.02 while
+        # validation accuracy swings by 20 points between epochs, which is
+        # textbook memorisation of individuals. At inference dropout is the
+        # identity, so it costs the MCU nothing and does not appear in the
+        # exported C at all.
+        self.drop = nn.Dropout(DROPOUT_P)
 
     def forward(self, beat: torch.Tensor, rr: torch.Tensor) -> torch.Tensor:
         x = beat.unsqueeze(1)                      # (B, 1, 256)
@@ -110,7 +119,7 @@ class CardiaNet(nn.Module):
         x = F.relu(self.bn3(self.conv3(x)))        # (B, 32, 16)
         x = x.mean(dim=2)                          # global average pool -> (B, 32)
         x = torch.cat([x, rr], dim=1)              # (B, 36)
-        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc1(self.drop(x)))
         return self.fc2(x)
 
 
@@ -149,6 +158,7 @@ class CardiaNetFolded(nn.Module):
         self.conv3 = nn.Conv1d(C2_OUT, C3_OUT, C3_K, stride=C3_S, padding=C3_P)
         self.fc1 = nn.Linear(FUSED_IN, FC1_OUT)
         self.fc2 = nn.Linear(FC1_OUT, cfg.N_CLASSES)
+        self.drop = nn.Dropout(DROPOUT_P)
 
     @classmethod
     def from_folded(cls, folded: dict[str, torch.Tensor]) -> "CardiaNetFolded":
@@ -175,5 +185,5 @@ class CardiaNetFolded(nn.Module):
         x = F.relu(self.conv3(x))
         x = x.mean(dim=2)
         x = torch.cat([x, rr], dim=1)
-        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc1(self.drop(x)))
         return self.fc2(x)

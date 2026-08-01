@@ -31,3 +31,6 @@ tests/build/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Local-only material — never published
+.private/

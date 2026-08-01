@@ -34,33 +34,37 @@ QMIN, QMAX = -128, 127
 # ---------------------------------------------------------------------------
 # Fixed-point primitives -- must mirror firmware/src/nn/nn_kernels.h exactly
 # ---------------------------------------------------------------------------
-def sat_doubling_high_mul(a: np.ndarray, b: int) -> np.ndarray:
-    a = a.astype(np.int64)
-    prod = a * np.int64(b)
+def sat_doubling_high_mul(a: np.ndarray, b) -> np.ndarray:
+    """(a * b) >> 31 with round-half-away-from-zero. `b` may be an array so a
+    whole layer's per-channel multipliers apply in one pass."""
+    a = np.asarray(a, dtype=np.int64)
+    prod = a * np.asarray(b, dtype=np.int64)
     nudge = np.where(prod >= 0, np.int64(1 << 30), np.int64(1 - (1 << 30)))
-    # C integer division truncates toward zero; numpy // floors. Emulate C.
     num = prod + nudge
     den = np.int64(1) << 31
-    out = np.trunc(num / den) if False else np.sign(num) * (np.abs(num) // den)
-    return out.astype(np.int64)
+    # C integer division truncates toward zero; numpy // floors. Emulate C.
+    return (np.sign(num) * (np.abs(num) // den)).astype(np.int64)
 
 
-def rounding_div_pot(x: np.ndarray, exponent: int) -> np.ndarray:
-    if exponent <= 0:
-        return x
-    x = x.astype(np.int64)
+def rounding_div_pot(x: np.ndarray, exponent) -> np.ndarray:
+    """Rounding right shift. `exponent` may be an array (per channel); an
+    exponent of 0 is the identity, which falls out of the same expression."""
+    x = np.asarray(x, dtype=np.int64)
+    exponent = np.asarray(exponent, dtype=np.int64)
     mask = (np.int64(1) << exponent) - 1
     remainder = x & mask
-    threshold = (mask >> 1) + np.where(x < 0, np.int64(1), np.int64(0))
+    threshold = (mask >> 1) + (x < 0).astype(np.int64)
     return (x >> exponent) + (remainder > threshold).astype(np.int64)
 
 
-def requantize(acc: np.ndarray, mult: int, shift: int) -> np.ndarray:
-    left = shift if shift > 0 else 0
-    right = 0 if shift > 0 else -shift
-    scaled = acc.astype(np.int64) * (np.int64(1) << left)
+def requantize(acc: np.ndarray, mult, shift) -> np.ndarray:
+    shift = np.asarray(shift, dtype=np.int64)
+    left = np.where(shift > 0, shift, 0)
+    right = np.where(shift > 0, 0, -shift)
+    scaled = np.asarray(acc, dtype=np.int64) * (np.int64(1) << left)
     # The C code holds this in int32 before the multiply; wrap identically so a
-    # value that would overflow on the MCU also overflows here.
+    # value that would overflow on the MCU also overflows here rather than
+    # quietly giving a better answer than the firmware can.
     scaled = scaled.astype(np.int32).astype(np.int64)
     return rounding_div_pot(sat_doubling_high_mul(scaled, mult), right)
 
@@ -80,26 +84,34 @@ def quantize_f32(x: np.ndarray, scale: float, zero_point: int) -> np.ndarray:
 # ---------------------------------------------------------------------------
 def conv1d_s8(x, w, b, mult, shift, stride, pad, in_zp, out_zp,
               act_min=QMIN, act_max=QMAX):
-    """x: (L, Cin) int8. w: (Cout, K, Cin) int8. Returns (Lout, Cout) int8."""
+    """x: (L, Cin) int8. w: (Cout, K, Cin) int8. Returns (Lout, Cout) int8.
+
+    Implemented as im2col + one matmul rather than nested loops. That is purely
+    for speed on the host -- the C version keeps the explicit loops, because on
+    a Cortex-M4 the im2col buffer would cost more RAM than the whole rest of
+    the network. The arithmetic is identical either way, which is the point.
+    """
     in_len, in_ch = x.shape
     out_ch, kernel, _ = w.shape
     out_len = (in_len + 2 * pad - kernel) // stride + 1
-    out = np.zeros((out_len, out_ch), dtype=np.int8)
 
-    xi = x.astype(np.int32) + np.int32(in_zp)
-    for o in range(out_len):
-        base = o * stride - pad
-        acc = b.astype(np.int64).copy()
-        for k in range(kernel):
-            idx = base + k
-            if idx < 0 or idx >= in_len:
-                continue  # zero padding means the quantised zero, i.e. -in_zp
-            acc += (w[:, k, :].astype(np.int64) * xi[idx].astype(np.int64)).sum(axis=1)
-        acc32 = acc.astype(np.int32)
-        v = np.array([requantize(np.array([acc32[c]]), mult[c], shift[c])[0]
-                      for c in range(out_ch)], dtype=np.int64) + out_zp
-        out[o] = sat_int8(np.clip(v, act_min, act_max))
-    return out
+    # Applying the input offset first means the padding is plain zeros: a
+    # padded element must contribute nothing to the sum, and after the offset
+    # the quantised zero IS zero.
+    xi = x.astype(np.int64) + np.int64(in_zp)
+    if pad:
+        xi = np.pad(xi, ((pad, pad), (0, 0)))
+
+    idx = (np.arange(out_len) * stride)[:, None] + np.arange(kernel)[None, :]
+    cols = xi[idx].reshape(out_len, kernel * in_ch)          # (Lout, K*Cin)
+    wf = w.astype(np.int64).reshape(out_ch, kernel * in_ch)  # (Cout, K*Cin)
+
+    acc = cols @ wf.T + b.astype(np.int64)[None, :]          # (Lout, Cout)
+    acc32 = acc.astype(np.int32)
+
+    v = requantize(acc32, np.asarray(mult, dtype=np.int64)[None, :],
+                   np.asarray(shift, dtype=np.int64)[None, :]) + out_zp
+    return sat_int8(np.clip(v, act_min, act_max))
 
 
 def maxpool1d_s8(x, kernel):

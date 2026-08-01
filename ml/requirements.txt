@@ -1,0 +1,7 @@
+# Cardia ML track.
+# Pinned to lower bounds rather than exact versions: the pipeline uses only
+# long-stable APIs, and pinning exactly makes the repo rot.
+numpy>=1.24
+scipy>=1.10
+wfdb>=4.1          # PhysioNet record/annotation reader
+torch>=2.2         # training + quantisation-aware training

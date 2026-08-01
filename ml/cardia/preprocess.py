@@ -48,6 +48,18 @@ def bandpass_sos(
     )
 
 
+def qrs_bandpass_sos(fs: int = cfg.FS_HZ) -> np.ndarray:
+    """5-15 Hz band used only by the QRS detector. See config.py for why the
+    detector gets its own filter rather than reusing the 0.5-40 Hz one."""
+    nyq = fs / 2.0
+    return sp_signal.butter(
+        cfg.QRS_BP_ORDER // 2,
+        [cfg.QRS_BP_LOW_HZ / nyq, cfg.QRS_BP_HIGH_HZ / nyq],
+        btype="bandpass",
+        output="sos",
+    )
+
+
 def bandpass_filter(x: np.ndarray, sos: np.ndarray | None = None) -> np.ndarray:
     """Causal bandpass. Deliberately `sosfilt`, never `sosfiltfilt`."""
     if sos is None:

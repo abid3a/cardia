@@ -11,10 +11,18 @@ from __future__ import annotations
 
 # --- Sampling ---------------------------------------------------------------
 # MIT-BIH is recorded at 360 Hz. The firmware samples at exactly the same rate
-# rather than resampling to a rounder number: 180 MHz / 360 Hz = 500000 divides
-# exactly on TIM2 (PSC=99, ARR=4999), and keeping one rate everywhere removes a
-# whole class of Python-vs-C mismatch from the parity test.
+# rather than resampling to a rounder number, which removes a whole class of
+# Python-vs-C mismatch from the parity test.
+#
+# The rate divides exactly on the target. Note the APB1 timer-clock rule, which
+# is easy to get wrong by a factor of two: at SYSCLK = 180 MHz the APB1
+# prescaler is /4, giving PCLK1 = 45 MHz, but because that prescaler is not 1
+# the timer clock is doubled to 90 MHz. So TIM2 sees 90 MHz, and
+# 90 MHz / 360 Hz = 250000 = 50 * 5000 -> PSC = 49, ARR = 4999.
 FS_HZ: int = 360
+TIM_CLOCK_HZ: int = 90_000_000
+TIM_PSC: int = 49
+TIM_ARR: int = 4999
 
 # --- Bandpass filter --------------------------------------------------------
 # 0.5 Hz high-pass removes baseline wander (respiration ~0.2-0.5 Hz, electrode
@@ -24,6 +32,21 @@ FS_HZ: int = 360
 BP_LOW_HZ: float = 0.5
 BP_HIGH_HZ: float = 40.0
 BP_ORDER: int = 4  # 4th order overall == 2 cascaded biquads
+
+# --- QRS-detection bandpass (Pan-Tompkins front end) ------------------------
+# A SECOND, narrower filter, running in parallel on the same raw stream.
+# This is not redundancy. The two filters have opposite goals:
+#   * 0.5-40 Hz feeds the classifier and must PRESERVE morphology -- the P and
+#     T waves are the whole point, and they live at 0.5-10 Hz.
+#   * 5-15 Hz feeds the detector and must DESTROY morphology -- it deliberately
+#     suppresses P and T so that the QRS is the only thing left standing,
+#     which is exactly what makes a simple amplitude threshold work.
+# Pan & Tompkins (1985) chose this band because QRS spectral energy peaks near
+# 10 Hz while P/T energy and baseline wander sit below ~5 Hz and muscle noise
+# above ~20 Hz.
+QRS_BP_LOW_HZ: float = 5.0
+QRS_BP_HIGH_HZ: float = 15.0
+QRS_BP_ORDER: int = 4
 
 # --- Beat window ------------------------------------------------------------
 # 256 samples at 360 Hz = 711 ms, centred asymmetrically on the R peak:

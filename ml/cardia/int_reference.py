@@ -74,8 +74,21 @@ def sat_int8(v: np.ndarray) -> np.ndarray:
 
 
 def quantize_f32(x: np.ndarray, scale: float, zero_point: int) -> np.ndarray:
-    v = x.astype(np.float32) / np.float32(scale)
-    q = np.where(v >= 0, np.floor(v + 0.5), np.ceil(v - 0.5)).astype(np.int64) + zero_point
+    """Quantise floats to int8.
+
+    Note the reciprocal-then-multiply rather than a divide. That is not
+    cosmetic: `x * (1/s)` and `x / s` differ in the last bit of the float32
+    result, and a value sitting exactly on a rounding boundary then quantises
+    one code apart. The C kernel multiplies by a precomputed reciprocal because
+    VDIV on a Cortex-M4F costs ~14 cycles against 1 for VMUL, and this runs 260
+    times per beat -- so the reference has to multiply too. Chasing this down
+    cost one mismatched beat out of 12,323; without it the parity claim would
+    have been "almost always" instead of "always".
+    """
+    inv = np.float32(1.0) / np.float32(scale)
+    v = x.astype(np.float32) * inv
+    q = np.where(v >= 0, np.floor(v + np.float32(0.5)),
+                 np.ceil(v - np.float32(0.5))).astype(np.int64) + zero_point
     return sat_int8(q)
 
 

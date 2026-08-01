@@ -2,6 +2,16 @@
 
 #include <string.h>
 
+/* Build with -DCARDIA_PT_DEBUG to trace every candidate peak and the decision
+ * made about it. Never compiled into the firmware; it exists because the only
+ * way to tune the T-wave rule is to see the numbers it is comparing. */
+#ifdef CARDIA_PT_DEBUG
+#include <stdio.h>
+#define PT_TRACE(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define PT_TRACE(...) ((void)0)
+#endif
+
 /* ------------------------------------------------------------------------- */
 /* Small helpers                                                              */
 /* ------------------------------------------------------------------------- */
@@ -86,29 +96,53 @@ static int rhythm_irregular(const cardia_pt_t *pt)
  * [mwi_index - N - 2, mwi_index - 2]. Search that window for the largest
  * |amplitude| in the conditioning band -- the band the beat window will
  * actually be cut from. */
+/* Half-width of the window used to measure a candidate's slope, in samples.
+ * ~28 ms either side of the fiducial point: wide enough to contain the whole
+ * up- or down-stroke of even a broad ventricular complex, narrow enough that
+ * two candidates 200 ms apart cannot share a single steep edge.
+ *
+ * That sharing was a real bug, not a hypothetical one. Measuring the slope
+ * across the full 56-sample search window meant a wide PVC -- whose squared
+ * derivative produces two integrator humps, one for the R upstroke and one for
+ * the deep S downstroke, separated by more than the 200 ms refractory -- had
+ * both humps report the *same* maximum slope. The T-wave rule compares the
+ * candidate's slope against the last accepted QRS's, so the ratio came out at
+ * exactly 1.000 and the rule could never fire. Record 119, which is largely
+ * ventricular bigeminy, produced 442 false detections from this alone. */
+#define PT_SLOPE_HALF_WIDTH 10u
+
 static void refine_peak(const cardia_pt_t *pt, uint32_t mwi_index,
                         cardia_pt_candidate_t *out)
 {
     const uint32_t width = CARDIA_PT_INTEGRATION_SAMPLES + 2u;
-    uint32_t stop = (mwi_index >= 2u) ? (mwi_index - 2u) : 0u;
-    uint32_t start = (stop >= width) ? (stop - width) : 0u;
+    const uint32_t stop = (mwi_index >= 2u) ? (mwi_index - 2u) : 0u;
+    const uint32_t start = (stop >= width) ? (stop - width) : 0u;
 
+    /* Pass 1: locate the fiducial point -- the largest excursion in the
+     * conditioning band, which is the band the beat window is cut from. */
     uint32_t best_i = start;
     float best_abs = -1.0f;
-    float best_bp = 0.0f;
-    float max_slope = 0.0f;
-
     for (uint32_t i = start; i <= stop; ++i) {
-        const float c = hist_at(pt->cond_hist, i);
-        const float a = f_abs(c);
+        const float a = f_abs(hist_at(pt->cond_hist, i));
         if (a > best_abs) {
             best_abs = a;
             best_i = i;
         }
+    }
+
+    /* Pass 2: characterise the candidate in a tight window around its OWN
+     * fiducial point, not across the whole search span. */
+    const uint32_t lo = (best_i > start + PT_SLOPE_HALF_WIDTH)
+                            ? (best_i - PT_SLOPE_HALF_WIDTH) : start;
+    const uint32_t hi = (best_i + PT_SLOPE_HALF_WIDTH < stop)
+                            ? (best_i + PT_SLOPE_HALF_WIDTH) : stop;
+
+    float best_bp = 0.0f;
+    float max_slope = 0.0f;
+    for (uint32_t i = lo; i <= hi; ++i) {
         const float b = f_abs(hist_at(pt->bp_hist, i));
         if (b > best_bp) best_bp = b;
-
-        if (i > start) {
+        if (i > lo) {
             const float d = f_abs(hist_at(pt->bp_hist, i) - hist_at(pt->bp_hist, i - 1u));
             if (d > max_slope) max_slope = d;
         }
@@ -259,6 +293,14 @@ int cardia_pt_step(cardia_pt_t *pt, float raw, float cond,
             cand.slope < 0.5f * pt->last_qrs_slope) {
             reject_twave = 1;
         }
+
+        PT_TRACE("cand n=%u idx=%u since=%u mwi=%.6f thr_i1=%.6f bp=%.6f "
+                 "thr_f1=%.6f slope=%.6f last_slope=%.6f ratio=%.3f refr=%d tw=%d\n",
+                 (unsigned)n, (unsigned)cand.index, (unsigned)since,
+                 (double)peak_mwi, (double)thr_i1, (double)cand.bp,
+                 (double)thr_f1, (double)cand.slope, (double)pt->last_qrs_slope,
+                 (double)(pt->last_qrs_slope > 0.0f ? cand.slope / pt->last_qrs_slope : -1.0f),
+                 reject_refractory, reject_twave);
 
         if (reject_refractory) {
             /* Physiologically impossible; not even worth updating noise

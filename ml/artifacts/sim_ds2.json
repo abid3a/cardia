@@ -1,0 +1,360 @@
+{
+  "records": [
+    100,
+    103,
+    105,
+    111,
+    113,
+    117,
+    121,
+    123,
+    200,
+    202,
+    210,
+    212,
+    213,
+    214,
+    219,
+    221,
+    222,
+    228,
+    231,
+    232,
+    233,
+    234
+  ],
+  "qrs_overall": {
+    "sensitivity": 0.998046599673762,
+    "positive_predictivity": 0.9835284778725938,
+    "tp": 49560,
+    "fp": 830,
+    "fn": 97,
+    "reference": 49657,
+    "detected": 50390,
+    "mean_offset_samples": -1.7675782090037928
+  },
+  "parity": {
+    "beats": 50374,
+    "bit_identical": 50374,
+    "mismatches": 0
+  },
+  "end_to_end": {
+    "accuracy": 0.817741935483871,
+    "n_beats": 49600,
+    "confusion_matrix": [
+      [
+        37473,
+        816,
+        5864,
+        43,
+        0
+      ],
+      [
+        320,
+        136,
+        1371,
+        0,
+        0
+      ],
+      [
+        217,
+        10,
+        2949,
+        9,
+        0
+      ],
+      [
+        290,
+        0,
+        93,
+        2,
+        0
+      ],
+      [
+        1,
+        0,
+        6,
+        0,
+        0
+      ]
+    ],
+    "per_class": {
+      "N": {
+        "support": 44196,
+        "tp": 37473,
+        "fp": 828,
+        "fn": 6723,
+        "sensitivity": 0.8478821612815639,
+        "ppv": 0.9783817654891517,
+        "specificity": 0.846780162842339,
+        "f1": 0.9084693988872322
+      },
+      "S": {
+        "support": 1827,
+        "tp": 136,
+        "fp": 826,
+        "fn": 1691,
+        "sensitivity": 0.07443897099069513,
+        "ppv": 0.14137214137214138,
+        "specificity": 0.9827098988968664,
+        "f1": 0.09752599498027967
+      },
+      "V": {
+        "support": 3185,
+        "tp": 2949,
+        "fp": 7334,
+        "fn": 236,
+        "sensitivity": 0.9259026687598116,
+        "ppv": 0.2867840124477293,
+        "specificity": 0.841990735753528,
+        "f1": 0.43792693792693793
+      },
+      "F": {
+        "support": 385,
+        "tp": 2,
+        "fp": 52,
+        "fn": 383,
+        "sensitivity": 0.005194805194805195,
+        "ppv": 0.037037037037037035,
+        "specificity": 0.9989434115615158,
+        "f1": 0.009111617312072893
+      },
+      "Q": {
+        "support": 7,
+        "tp": 0,
+        "fp": 0,
+        "fn": 7,
+        "sensitivity": 0.0,
+        "ppv": NaN,
+        "specificity": 1.0,
+        "f1": 0.0
+      }
+    },
+    "macro_sensitivity": 0.463354651556719,
+    "macro_ppv": 0.3608937390865148,
+    "macro_f1": 0.3632584872766307,
+    "macro_f1_nsv": 0.4813074439314833
+  },
+  "per_record": [
+    {
+      "record": 100,
+      "qrs_sensitivity": 0.9995594713656387,
+      "qrs_ppv": 1.0,
+      "tp": 2269,
+      "fp": 0,
+      "fn": 1,
+      "beats_classified": 2269,
+      "mean_offset_samples": -2.367122080211547
+    },
+    {
+      "record": 103,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 1.0,
+      "tp": 2082,
+      "fp": 0,
+      "fn": 0,
+      "beats_classified": 2081,
+      "mean_offset_samples": -2.475024015369837
+    },
+    {
+      "record": 105,
+      "qrs_sensitivity": 0.9976644608797197,
+      "qrs_ppv": 0.9567002612915267,
+      "tp": 2563,
+      "fp": 116,
+      "fn": 6,
+      "beats_classified": 2679,
+      "mean_offset_samples": -0.8552477565353102
+    },
+    {
+      "record": 111,
+      "qrs_sensitivity": 0.9934024505183789,
+      "qrs_ppv": 0.9237510955302366,
+      "tp": 2108,
+      "fp": 174,
+      "fn": 14,
+      "beats_classified": 2281,
+      "mean_offset_samples": 0.061669829222011384
+    },
+    {
+      "record": 113,
+      "qrs_sensitivity": 0.9994422755158952,
+      "qrs_ppv": 1.0,
+      "tp": 1792,
+      "fp": 0,
+      "fn": 1,
+      "beats_classified": 1791,
+      "mean_offset_samples": -2.4425223214285716
+    },
+    {
+      "record": 117,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 1.0,
+      "tp": 1533,
+      "fp": 0,
+      "fn": 0,
+      "beats_classified": 1532,
+      "mean_offset_samples": 1.3144161774298762
+    },
+    {
+      "record": 121,
+      "qrs_sensitivity": 0.99892530897367,
+      "qrs_ppv": 1.0,
+      "tp": 1859,
+      "fp": 0,
+      "fn": 2,
+      "beats_classified": 1858,
+      "mean_offset_samples": -1.877891339429801
+    },
+    {
+      "record": 123,
+      "qrs_sensitivity": 0.9986807387862797,
+      "qrs_ppv": 1.0,
+      "tp": 1514,
+      "fp": 0,
+      "fn": 2,
+      "beats_classified": 1513,
+      "mean_offset_samples": -2.976882430647292
+    },
+    {
+      "record": 200,
+      "qrs_sensitivity": 0.9988452655889145,
+      "qrs_ppv": 0.9953970080552359,
+      "tp": 2595,
+      "fp": 12,
+      "fn": 3,
+      "beats_classified": 2607,
+      "mean_offset_samples": -2.4678227360308287
+    },
+    {
+      "record": 202,
+      "qrs_sensitivity": 0.9981264637002342,
+      "qrs_ppv": 1.0,
+      "tp": 2131,
+      "fp": 0,
+      "fn": 4,
+      "beats_classified": 2130,
+      "mean_offset_samples": -2.5565462224307836
+    },
+    {
+      "record": 210,
+      "qrs_sensitivity": 0.9894179894179894,
+      "qrs_ppv": 0.9946808510638298,
+      "tp": 2618,
+      "fp": 14,
+      "fn": 28,
+      "beats_classified": 2631,
+      "mean_offset_samples": -1.884262796027502
+    },
+    {
+      "record": 212,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 1.0,
+      "tp": 2745,
+      "fp": 0,
+      "fn": 0,
+      "beats_classified": 2745,
+      "mean_offset_samples": -2.593806921675774
+    },
+    {
+      "record": 213,
+      "qrs_sensitivity": 0.9993840468124423,
+      "qrs_ppv": 1.0,
+      "tp": 3245,
+      "fp": 0,
+      "fn": 2,
+      "beats_classified": 3245,
+      "mean_offset_samples": -1.8268104776579352
+    },
+    {
+      "record": 214,
+      "qrs_sensitivity": 0.99867197875166,
+      "qrs_ppv": 0.9907773386034255,
+      "tp": 2256,
+      "fp": 21,
+      "fn": 3,
+      "beats_classified": 2277,
+      "mean_offset_samples": -3.518617021276596
+    },
+    {
+      "record": 219,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 1.0,
+      "tp": 2152,
+      "fp": 0,
+      "fn": 0,
+      "beats_classified": 2151,
+      "mean_offset_samples": -1.854089219330855
+    },
+    {
+      "record": 221,
+      "qrs_sensitivity": 0.9991749174917491,
+      "qrs_ppv": 1.0,
+      "tp": 2422,
+      "fp": 0,
+      "fn": 2,
+      "beats_classified": 2421,
+      "mean_offset_samples": -2.3464079273327827
+    },
+    {
+      "record": 222,
+      "qrs_sensitivity": 0.9943548387096774,
+      "qrs_ppv": 0.9208364451082898,
+      "tp": 2466,
+      "fp": 212,
+      "fn": 14,
+      "beats_classified": 2677,
+      "mean_offset_samples": 3.067315490673155
+    },
+    {
+      "record": 228,
+      "qrs_sensitivity": 0.9936616284739151,
+      "qrs_ppv": 0.9396035039188566,
+      "tp": 2038,
+      "fp": 131,
+      "fn": 13,
+      "beats_classified": 2168,
+      "mean_offset_samples": -1.6668302257114818
+    },
+    {
+      "record": 231,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 0.9584605986560782,
+      "tp": 1569,
+      "fp": 68,
+      "fn": 0,
+      "beats_classified": 1636,
+      "mean_offset_samples": -1.8030592734225621
+    },
+    {
+      "record": 232,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 0.9559376679204729,
+      "tp": 1779,
+      "fp": 82,
+      "fn": 0,
+      "beats_classified": 1860,
+      "mean_offset_samples": -3.044406970207982
+    },
+    {
+      "record": 233,
+      "qrs_sensitivity": 0.9996749024707412,
+      "qrs_ppv": 1.0,
+      "tp": 3075,
+      "fp": 0,
+      "fn": 1,
+      "beats_classified": 3074,
+      "mean_offset_samples": -2.575609756097561
+    },
+    {
+      "record": 234,
+      "qrs_sensitivity": 0.9996363636363637,
+      "qrs_ppv": 1.0,
+      "tp": 2749,
+      "fp": 0,
+      "fn": 1,
+      "beats_classified": 2748,
+      "mean_offset_samples": -2.197162604583485
+    }
+  ]
+}

@@ -93,10 +93,10 @@ uint8_t cardia_classify(const float *beat, const float *rr, int32_t *logits)
      * the fused scale so the two branches can share one int8 tensor.
      *
      * The projection is not decoration. Feeding the four raw features straight
-     * into the fused vector left the network unable to use them: on held-out
-     * validation patients a single threshold on the prematurity feature beat
-     * the whole network's S sensitivity by 60 points. 64 MACs bought that
-     * back. */
+     * into the fused vector left the network barely able to use them: on
+     * held-out validation patients a single threshold on the prematurity
+     * feature reached 76% S sensitivity where the whole network reached 21%.
+     * 64 MACs bought most of that back. */
     cardia_quantize_f32(rr, CARDIA_N_RR_FEATURES, CARDIA_RR_IN_SCALE,
                         CARDIA_RR_IN_ZP, s_rr_q);
     cardia_fully_connected_s8(s_rr_q, CARDIA_N_RR_FEATURES,

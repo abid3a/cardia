@@ -121,6 +121,28 @@ target_compile_options(cardia.elf PRIVATE
     -Wextra
     -Os
     -g3        # full debug info; it lives in the .elf and never reaches flash
+
+    # Do NOT let the compiler contract a multiply and an add into a single
+    # fused VFMA. Fusing is both faster and more accurate -- it rounds once
+    # instead of twice -- but the host simulator is built with the same flag
+    # off, and the whole verification argument rests on the two producing
+    # bit-identical output. An FMA in the biquad would make the target's filter
+    # disagree with the host's in the last bits, and every downstream
+    # comparison would degrade from "equal" to "close". Determinism is worth
+    # more here than the last ULP.
+    -ffp-contract=off
+)
+
+# The DSP and inference kernels are compiled for speed rather than size.
+#
+# At -Os the compiler spills the convolution's inner loop to the stack: the
+# per-MAC sequence disassembles to roughly a dozen instructions, most of them
+# stack traffic. These files are a small part of a 15 KB image, and they are
+# the only code that runs in the hot path, so the size/speed trade is one-sided.
+# The rest of the firmware stays at -Os.
+set_source_files_properties(
+    ${CARDIA_PORTABLE_SOURCES}
+    PROPERTIES COMPILE_OPTIONS "-O2"
 )
 
 target_compile_definitions(cardia.elf PRIVATE

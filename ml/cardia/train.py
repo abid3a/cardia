@@ -98,7 +98,7 @@ def effective_patients(labels: np.ndarray, records: np.ndarray,
 
 
 def class_weights(labels: np.ndarray, records: np.ndarray, alpha: float,
-                  cap: float = 6.0, min_patients: int = 3,
+                  cap: float = 15.0, min_patients: int = 3,
                   min_beats: int = 100) -> torch.Tensor:
     """Inverse-frequency weights, capped, and gated on patient diversity.
 

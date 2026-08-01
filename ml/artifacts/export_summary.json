@@ -1,0 +1,9 @@
+{
+  "weight_bytes_int8": 5304,
+  "bias_and_requant_bytes": 884,
+  "total_rodata_bytes": 6188,
+  "header": "/mnt/c/Users/Admin/Desktop/claude_harness/domains/projects/cardia/firmware/src/nn/cardia_model.h",
+  "source": "/mnt/c/Users/Admin/Desktop/claude_harness/domains/projects/cardia/firmware/src/nn/cardia_model.c",
+  "int_vs_qat_agreement": 0.9995,
+  "n_compared": 4000
+}

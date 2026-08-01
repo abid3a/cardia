@@ -44,14 +44,14 @@ FC1_OUT = 32
 #
 # Earlier versions fed the four raw RR features straight into the fused vector
 # alongside 32 pooled morphology channels. That looked economical and was
-# measurably wrong: on the held-out validation patients a SINGLE hand-written
-# threshold on the prematurity feature reached 82% S sensitivity at 56%
-# positive predictivity, while the network managed 21% at 56%. The information
-# was present and the model was not using it -- four inputs out of thirty-six,
-# on a scale set by whatever the convolution stack happened to output, cannot
-# compete for the first layer's attention. Giving the timing features their own
-# projection lets them arrive at a comparable magnitude and with enough
-# capacity to encode a decision boundary, for 64 extra MACs.
+# measurably wrong. On the held-out validation patients, a SINGLE hand-written
+# threshold on the prematurity feature (predict S when pre-RR / local-RR < 0.26)
+# reached 76% S sensitivity at 41% positive predictivity, while the full network
+# managed 21% at 56%. A one-line rule should not dominate a trained model on the
+# feature that model was given. Four inputs out of thirty-six, on a scale set by
+# whatever the convolution stack happened to output, cannot compete for the
+# first layer's attention. Giving the timing features their own projection and
+# their own quantisation scale costs 64 MACs and roughly halved the gap.
 RR_HIDDEN = 16
 
 L1 = (cfg.BEAT_LEN + 2 * C1_P - C1_K) // C1_S + 1   # 64

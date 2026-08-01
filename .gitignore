@@ -1,0 +1,33 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Datasets and derived artifacts (regenerate with `make data`)
+data/
+ml/artifacts/*.pt
+ml/artifacts/*.npz
+
+# Build outputs
+build/
+build-*/
+sim/build/
+tests/build/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+*.su
+*.lst
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

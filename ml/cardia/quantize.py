@@ -183,6 +183,7 @@ class CardiaNetQAT(nn.Module):
         super().__init__()
         self.net = folded
         self.obs_in = ActObserver(symmetric=False)     # normalised beat window
+        self.obs_rr = ActObserver(symmetric=False)     # raw RR features
         self.obs_c1 = ActObserver()                    # after conv1 + ReLU
         self.obs_c2 = ActObserver()                    # after conv2 + ReLU
         self.obs_c3 = ActObserver()                    # after conv3 + ReLU
@@ -215,10 +216,17 @@ class CardiaNetQAT(nn.Module):
         x = self._fq(self.obs_c3, F.relu(x))
 
         x = x.mean(dim=2)
+
+        # Timing branch. Quantised on its own scale (the four features live in
+        # [-1, 1] by construction, so they would waste most of the fused
+        # tensor's range), projected, then requantised into the fused scale.
+        r = self._fq(self.obs_rr, rr)
+        r = F.relu(F.linear(r, self._fqw(n.rr_fc.weight, False), n.rr_fc.bias))
+
         # Both branches must share one scale to be concatenated as int8, so a
         # single observer watches the concatenated vector and both sides are
         # requantised into it.
-        x = torch.cat([x, rr], dim=1)
+        x = torch.cat([x, r], dim=1)
         x = self._fq(self.obs_fused, x)
 
         x = F.linear(n.drop(x), self._fqw(n.fc1.weight, False), n.fc1.bias)
@@ -272,6 +280,8 @@ class QuantModel:
     layers: dict[str, QuantLayer]
     input_scale: float
     input_zp: int
+    rr_scale: float
+    rr_zp: int
     fused_scale: float
     fused_zp: int
     logit_scale: float
@@ -297,6 +307,7 @@ def export(qat: CardiaNetQAT) -> QuantModel:
     """Freeze the QAT model into integer tensors plus requantisation params."""
     n = qat.net
     in_s, in_z = qat.obs_in.qparams()
+    rr_s, rr_z = qat.obs_rr.qparams()
     c1_s, c1_z = qat.obs_c1.qparams()
     c2_s, c2_z = qat.obs_c2.qparams()
     c3_s, c3_z = qat.obs_c3.qparams()
@@ -325,6 +336,12 @@ def export(qat: CardiaNetQAT) -> QuantModel:
                                torch.empty(0),
                                [gap_mult], [gap_shift], c3_s, c3_z, fu_s, fu_z)
 
+    wq_r, ws_r = _q_weight(n.rr_fc.weight.detach(), per_channel=False)
+    bq_r = torch.round(n.rr_fc.bias.detach() / (rr_s * ws_r[0])).to(torch.int32)
+    m_r, sh_r = quantize_multiplier(rr_s * float(ws_r[0]) / fu_s)
+    layers["rr_fc"] = QuantLayer("rr_fc", wq_r, bq_r, ws_r, [m_r], [sh_r],
+                                 rr_s, rr_z, fu_s, fu_z)
+
     wq, ws = _q_weight(n.fc1.weight.detach(), per_channel=False)
     bq = torch.round(n.fc1.bias.detach() / (fu_s * ws[0])).to(torch.int32)
     m, sh = quantize_multiplier(fu_s * float(ws[0]) / f1_s)
@@ -339,4 +356,5 @@ def export(qat: CardiaNetQAT) -> QuantModel:
     layers["fc2"] = QuantLayer("fc2", wq2, bq2, ws2, [0], [0], f1_s, f1_z, logit_scale, 0)
 
     return QuantModel(layers=layers, input_scale=in_s, input_zp=in_z,
+                      rr_scale=rr_s, rr_zp=rr_z,
                       fused_scale=fu_s, fused_zp=fu_z, logit_scale=logit_scale)

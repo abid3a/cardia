@@ -169,6 +169,8 @@ class IntCardiaNet:
         self.b1 = L["conv1"].bias_q.numpy()
         self.b2 = L["conv2"].bias_q.numpy()
         self.b3 = L["conv3"].bias_q.numpy()
+        self.wrr = L["rr_fc"].weight_q.numpy()
+        self.brr = L["rr_fc"].bias_q.numpy()
         self.wfc1 = L["fc1"].weight_q.numpy()
         self.bfc1 = L["fc1"].bias_q.numpy()
         self.wfc2 = L["fc2"].weight_q.numpy()
@@ -199,8 +201,11 @@ class IntCardiaNet:
         g = L["gap"]
         pooled = global_avgpool_s8(x, -g.input_zp, g.output_zp, g.mult[0], g.shift[0])
 
-        rr_q = quantize_f32(np.asarray(rr, dtype=np.float32), qm.fused_scale, qm.fused_zp)
-        fused = np.concatenate([pooled, rr_q]).astype(np.int8)
+        rf = L["rr_fc"]
+        rr_q = quantize_f32(np.asarray(rr, dtype=np.float32), qm.rr_scale, qm.rr_zp)
+        rr_h = fully_connected_s8(rr_q, self.wrr, self.brr, rf.mult[0], rf.shift[0],
+                                  -rf.input_zp, rf.output_zp, act_min=rf.output_zp)
+        fused = np.concatenate([pooled, rr_h]).astype(np.int8)
 
         f1 = L["fc1"]
         h = fully_connected_s8(fused, self.wfc1, self.bfc1, f1.mult[0], f1.shift[0],

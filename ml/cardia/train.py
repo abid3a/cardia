@@ -98,7 +98,8 @@ def effective_patients(labels: np.ndarray, records: np.ndarray,
 
 
 def class_weights(labels: np.ndarray, records: np.ndarray, alpha: float,
-                  cap: float = 6.0, min_patients: int = 3) -> torch.Tensor:
+                  cap: float = 6.0, min_patients: int = 3,
+                  min_beats: int = 100) -> torch.Tensor:
     """Inverse-frequency weights, capped, and gated on patient diversity.
 
         w_c = clip((count_majority / count_c) ** alpha, 1, cap)
@@ -124,8 +125,14 @@ def class_weights(labels: np.ndarray, records: np.ndarray, alpha: float,
     counts = np.maximum(counts, 1.0)
     ref = float(counts.max())
     w = np.clip((ref / counts) ** alpha, 1.0, cap)
+    #
+    # `min_beats` closes the same hole from the other side. The patient gate
+    # alone is fooled by a class so tiny that one beat exceeds 10% of it: DS1's
+    # Q class has 8 beats across three records, which passes a patient-diversity
+    # test while carrying no learnable signal at all. Both conditions must hold.
     for c in range(cfg.N_CLASSES):
-        if effective_patients(labels, records, c) < min_patients:
+        if (effective_patients(labels, records, c) < min_patients
+                or counts[c] < min_beats):
             w[c] = 1.0
     return torch.tensor(w, dtype=torch.float32)
 

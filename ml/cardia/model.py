@@ -40,6 +40,19 @@ C1_OUT, C1_K, C1_S, C1_P = 8, 11, 4, 5
 C2_OUT, C2_K, C2_S, C2_P = 16, 7, 1, 3
 C3_OUT, C3_K, C3_S, C3_P = 32, 5, 1, 2
 FC1_OUT = 32
+# Width of the RR-interval branch.
+#
+# Earlier versions fed the four raw RR features straight into the fused vector
+# alongside 32 pooled morphology channels. That looked economical and was
+# measurably wrong: on the held-out validation patients a SINGLE hand-written
+# threshold on the prematurity feature reached 82% S sensitivity at 56%
+# positive predictivity, while the network managed 21% at 56%. The information
+# was present and the model was not using it -- four inputs out of thirty-six,
+# on a scale set by whatever the convolution stack happened to output, cannot
+# compete for the first layer's attention. Giving the timing features their own
+# projection lets them arrive at a comparable magnitude and with enough
+# capacity to encode a decision boundary, for 64 extra MACs.
+RR_HIDDEN = 16
 
 L1 = (cfg.BEAT_LEN + 2 * C1_P - C1_K) // C1_S + 1   # 64
 L1P = L1 // 2                                        # 32
@@ -47,7 +60,7 @@ L2 = (L1P + 2 * C2_P - C2_K) // C2_S + 1             # 32
 L2P = L2 // 2                                        # 16
 L3 = (L2P + 2 * C3_P - C3_K) // C3_S + 1             # 16
 
-FUSED_IN = C3_OUT + cfg.N_RR_FEATURES                # 36
+FUSED_IN = C3_OUT + RR_HIDDEN                        # 48
 DROPOUT_P = 0.3
 
 
@@ -58,6 +71,7 @@ def mac_count() -> dict[str, int]:
         "conv1": L1 * C1_OUT * C1_K * 1,
         "conv2": L2 * C2_OUT * C2_K * C1_OUT,
         "conv3": L3 * C3_OUT * C3_K * C2_OUT,
+        "rr_fc": cfg.N_RR_FEATURES * RR_HIDDEN,
         "fc1": FUSED_IN * FC1_OUT,
         "fc2": FC1_OUT * cfg.N_CLASSES,
     }
@@ -70,10 +84,12 @@ def param_count() -> dict[str, int]:
         "conv1": C1_OUT * 1 * C1_K,
         "conv2": C2_OUT * C1_OUT * C2_K,
         "conv3": C3_OUT * C2_OUT * C3_K,
+        "rr_fc": cfg.N_RR_FEATURES * RR_HIDDEN,
         "fc1": FUSED_IN * FC1_OUT,
         "fc2": FC1_OUT * cfg.N_CLASSES,
     }
-    b = {"conv1": C1_OUT, "conv2": C2_OUT, "conv3": C3_OUT, "fc1": FC1_OUT, "fc2": cfg.N_CLASSES}
+    b = {"conv1": C1_OUT, "conv2": C2_OUT, "conv3": C3_OUT, "rr_fc": RR_HIDDEN,
+         "fc1": FC1_OUT, "fc2": cfg.N_CLASSES}
     out = {k: w[k] + b[k] for k in w}
     out["weights_total"] = sum(w.values())
     out["biases_total"] = sum(b.values())
@@ -99,6 +115,7 @@ class CardiaNet(nn.Module):
         self.bn2 = nn.BatchNorm1d(C2_OUT)
         self.conv3 = nn.Conv1d(C2_OUT, C3_OUT, C3_K, stride=C3_S, padding=C3_P, bias=False)
         self.bn3 = nn.BatchNorm1d(C3_OUT)
+        self.rr_fc = nn.Linear(cfg.N_RR_FEATURES, RR_HIDDEN)
         self.fc1 = nn.Linear(FUSED_IN, FC1_OUT)
         self.fc2 = nn.Linear(FC1_OUT, cfg.N_CLASSES)
         # Dropout only on the fused feature vector, and only during training.
@@ -118,7 +135,8 @@ class CardiaNet(nn.Module):
         x = F.max_pool1d(x, 2)                     # (B, 16, 16)
         x = F.relu(self.bn3(self.conv3(x)))        # (B, 32, 16)
         x = x.mean(dim=2)                          # global average pool -> (B, 32)
-        x = torch.cat([x, rr], dim=1)              # (B, 36)
+        r = F.relu(self.rr_fc(rr))                 # timing branch -> (B, 16)
+        x = torch.cat([x, r], dim=1)               # (B, 48)
         x = F.relu(self.fc1(self.drop(x)))
         return self.fc2(x)
 
@@ -140,6 +158,8 @@ def fold_bn(model: CardiaNet) -> dict[str, torch.Tensor]:
         scale = bn.weight / torch.sqrt(bn.running_var + bn.eps)
         out[f"conv{ci}.weight"] = (conv.weight * scale.reshape(-1, 1, 1)).detach()
         out[f"conv{ci}.bias"] = (bn.bias - scale * bn.running_mean).detach()
+    out["rr_fc.weight"] = model.rr_fc.weight.detach().clone()
+    out["rr_fc.bias"] = model.rr_fc.bias.detach().clone()
     out["fc1.weight"] = model.fc1.weight.detach().clone()
     out["fc1.bias"] = model.fc1.bias.detach().clone()
     out["fc2.weight"] = model.fc2.weight.detach().clone()
@@ -156,6 +176,7 @@ class CardiaNetFolded(nn.Module):
         self.conv1 = nn.Conv1d(1, C1_OUT, C1_K, stride=C1_S, padding=C1_P)
         self.conv2 = nn.Conv1d(C1_OUT, C2_OUT, C2_K, stride=C2_S, padding=C2_P)
         self.conv3 = nn.Conv1d(C2_OUT, C3_OUT, C3_K, stride=C3_S, padding=C3_P)
+        self.rr_fc = nn.Linear(cfg.N_RR_FEATURES, RR_HIDDEN)
         self.fc1 = nn.Linear(FUSED_IN, FC1_OUT)
         self.fc2 = nn.Linear(FC1_OUT, cfg.N_CLASSES)
         self.drop = nn.Dropout(DROPOUT_P)
@@ -170,6 +191,8 @@ class CardiaNetFolded(nn.Module):
             m.conv2.bias.copy_(folded["conv2.bias"])
             m.conv3.weight.copy_(folded["conv3.weight"])
             m.conv3.bias.copy_(folded["conv3.bias"])
+            m.rr_fc.weight.copy_(folded["rr_fc.weight"])
+            m.rr_fc.bias.copy_(folded["rr_fc.bias"])
             m.fc1.weight.copy_(folded["fc1.weight"])
             m.fc1.bias.copy_(folded["fc1.bias"])
             m.fc2.weight.copy_(folded["fc2.weight"])
@@ -184,6 +207,7 @@ class CardiaNetFolded(nn.Module):
         x = F.max_pool1d(x, 2)
         x = F.relu(self.conv3(x))
         x = x.mean(dim=2)
-        x = torch.cat([x, rr], dim=1)
+        r = F.relu(self.rr_fc(rr))
+        x = torch.cat([x, r], dim=1)
         x = F.relu(self.fc1(self.drop(x)))
         return self.fc2(x)

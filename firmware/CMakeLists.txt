@@ -173,7 +173,17 @@ if(CARDIA_USE_CMSIS_NN)
       ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/CMSIS_5/CMSIS/Core/Include
   )
 
-  file(GLOB_RECURSE CMSIS_NN_SOURCES ${CMSIS_NN_DIR}/Source/*.c)
+  # Only the integer kernels. CMSIS-NN also ships f32/f16 variants that pull in
+  # CMSIS-DSP's float type headers and a transitive dependency chain this
+  # project has no use for -- a 15 KB image has no business compiling float
+  # elementwise-maximum kernels it will never call.
+  file(GLOB_RECURSE CMSIS_NN_ALL ${CMSIS_NN_DIR}/Source/*.c)
+  set(CMSIS_NN_SOURCES "")
+  foreach(_f IN LISTS CMSIS_NN_ALL)
+    if(NOT _f MATCHES "_f32\\.c$|_f16\\.c$|_flt\\.c$")
+      list(APPEND CMSIS_NN_SOURCES ${_f})
+    endif()
+  endforeach()
   target_sources(cardia.elf PRIVATE ${CMSIS_NN_SOURCES})
 endif()
 

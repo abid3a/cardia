@@ -3,6 +3,21 @@
 #include "cardia_model.h"
 
 #ifdef CARDIA_USE_CMSIS_NN
+/* CMSIS-NN is vendored (third_party/CMSIS-NN) and this build links its integer
+ * kernels, but the layer calls below still use the portable reference kernels.
+ *
+ * Stated plainly rather than hidden behind an #ifdef that implies otherwise:
+ * the swap-in is prepared, not done. What has been established is the part that
+ * makes it a swap rather than a rewrite -- nn_kernels.h implements exactly the
+ * gemmlowp/CMSIS-NN requantisation (saturating rounding doubling high multiply,
+ * then a rounding divide by a power of two), so arm_convolve_1_x_n_s8 and
+ * arm_fully_connected_s8 produce bit-identical output to the reference
+ * implementation rather than merely similar output. That is what allows the
+ * parity test to keep its meaning after the substitution.
+ *
+ * Expected gain, unmeasured: SMLAD retires two 16-bit MACs per cycle against
+ * the ~10 cycles per MAC the portable scalar loop costs at -O2, so roughly
+ * 3-5x on the 77k MACs per beat. See docs/RESULTS.md section 6. */
 #include "arm_nnfunctions.h"
 #endif
 

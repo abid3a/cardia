@@ -1,122 +1,120 @@
 {
   "records": [
     100,
-    103,
     119,
-    208,
-    203
+    232
   ],
   "qrs_overall": {
-    "sensitivity": 0.9971463514064411,
-    "positive_predictivity": 0.9922920892494929,
-    "tp": 12230,
-    "fp": 95,
-    "fn": 35,
-    "reference": 12265,
-    "detected": 12325,
-    "mean_offset_samples": -2.2508603648749754
+    "sensitivity": 0.9998342724560823,
+    "positive_predictivity": 0.9854622672329304,
+    "tp": 6033,
+    "fp": 89,
+    "fn": 1,
+    "reference": 6034,
+    "detected": 6122,
+    "mean_offset_samples": -2.5828522527426974
   },
   "parity": {
-    "beats": 12323,
-    "bit_identical": 12323,
+    "beats": 6120,
+    "bit_identical": 6120,
     "mismatches": 0
   },
   "end_to_end": {
-    "accuracy": 0.9677920379301889,
-    "n_beats": 12233,
+    "accuracy": 0.7705189852429116,
+    "n_beats": 6031,
     "confusion_matrix": [
       [
-        9822,
-        16,
-        104,
-        8,
-        0
-      ],
-      [
-        37,
-        1,
-        1,
+        4170,
+        0,
+        3,
         0,
         0
       ],
       [
-        13,
-        1,
-        1856,
+        833,
+        33,
+        548,
         0,
         0
       ],
       [
-        129,
         0,
-        82,
-        160,
+        0,
+        444,
+        0,
         0
       ],
       [
-        2,
         0,
-        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
         0,
         0
       ]
     ],
     "per_class": {
       "N": {
-        "support": 9950,
-        "tp": 9822,
-        "fp": 181,
-        "fn": 128,
-        "sensitivity": 0.9871356783919598,
-        "ppv": 0.9819054283714885,
-        "specificity": 0.92071835304424,
-        "f1": 0.9845136069763946
+        "support": 4173,
+        "tp": 4170,
+        "fp": 833,
+        "fn": 3,
+        "sensitivity": 0.9992810927390366,
+        "ppv": 0.833499900059964,
+        "specificity": 0.5516684607104413,
+        "f1": 0.9088927637314734
       },
       "S": {
-        "support": 39,
-        "tp": 1,
-        "fp": 17,
-        "fn": 38,
-        "sensitivity": 0.02564102564102564,
-        "ppv": 0.05555555555555555,
-        "specificity": 0.9986058717402001,
-        "f1": 0.03508771929824561
+        "support": 1414,
+        "tp": 33,
+        "fp": 0,
+        "fn": 1381,
+        "sensitivity": 0.02333804809052334,
+        "ppv": 1.0,
+        "specificity": 1.0,
+        "f1": 0.04561161022805805
       },
       "V": {
-        "support": 1870,
-        "tp": 1856,
-        "fp": 188,
-        "fn": 14,
-        "sensitivity": 0.9925133689839573,
-        "ppv": 0.9080234833659491,
-        "specificity": 0.9818585351732124,
-        "f1": 0.9483903934593766
+        "support": 444,
+        "tp": 444,
+        "fp": 551,
+        "fn": 0,
+        "sensitivity": 1.0,
+        "ppv": 0.4462311557788945,
+        "specificity": 0.9013781993914445,
+        "f1": 0.6170952050034746
       },
       "F": {
-        "support": 371,
-        "tp": 160,
-        "fp": 8,
-        "fn": 211,
-        "sensitivity": 0.431266846361186,
-        "ppv": 0.9523809523809523,
-        "specificity": 0.9993255774742876,
-        "f1": 0.5936920222634509
-      },
-      "Q": {
-        "support": 3,
+        "support": 0,
         "tp": 0,
         "fp": 0,
-        "fn": 3,
-        "sensitivity": 0.0,
+        "fn": 0,
+        "sensitivity": NaN,
         "ppv": NaN,
         "specificity": 1.0,
-        "f1": 0.0
+        "f1": NaN
+      },
+      "Q": {
+        "support": 0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "sensitivity": NaN,
+        "ppv": NaN,
+        "specificity": 1.0,
+        "f1": NaN
       }
     },
-    "macro_sensitivity": 0.6091392298445322,
-    "macro_ppv": 0.7244663549184864,
-    "macro_f1": 0.640420935499367,
-    "macro_f1_nsv": 0.655997239911339
+    "macro_sensitivity": 0.67420638027652,
+    "macro_ppv": 0.7599103519462863,
+    "macro_f1": 0.523866526321002,
+    "macro_f1_nsv": 0.523866526321002
   },
   "per_record": [
     {
@@ -130,16 +128,6 @@
       "mean_offset_samples": -2.367122080211547
     },
     {
-      "record": 103,
-      "qrs_sensitivity": 1.0,
-      "qrs_ppv": 1.0,
-      "tp": 2082,
-      "fp": 0,
-      "fn": 0,
-      "beats_classified": 2081,
-      "mean_offset_samples": -2.475024015369837
-    },
-    {
       "record": 119,
       "qrs_sensitivity": 1.0,
       "qrs_ppv": 0.9964859437751004,
@@ -150,24 +138,14 @@
       "mean_offset_samples": -2.337027707808564
     },
     {
-      "record": 208,
-      "qrs_sensitivity": 0.9952558454761098,
-      "qrs_ppv": 0.9908906882591093,
-      "tp": 2937,
-      "fp": 27,
-      "fn": 14,
-      "beats_classified": 2964,
-      "mean_offset_samples": -2.857677902621723
-    },
-    {
-      "record": 203,
-      "qrs_sensitivity": 0.9932818273429627,
-      "qrs_ppv": 0.9797879390324719,
-      "tp": 2957,
-      "fp": 61,
-      "fn": 20,
-      "beats_classified": 3018,
-      "mean_offset_samples": -1.217450118363206
+      "record": 232,
+      "qrs_sensitivity": 1.0,
+      "qrs_ppv": 0.9559376679204729,
+      "tp": 1779,
+      "fp": 82,
+      "fn": 0,
+      "beats_classified": 1860,
+      "mean_offset_samples": -3.044406970207982
     }
   ]
 }

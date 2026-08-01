@@ -29,8 +29,9 @@ typedef struct {
  * numerator and denominator do not share a summing node, so the large
  * intermediate value that a high-Q section produces cannot blow up the state
  * the way it can in direct form II. At 0.5 Hz on a 360 Hz sample rate the
- * high-pass section has its poles at radius ~0.9956, which is high-Q enough
- * that this is a practical concern in float32, not a textbook one. */
+ * high-pass section has its poles at radius sqrt(a2) = sqrt(0.987741721)
+ * = 0.99385, which is high-Q enough that this is a practical concern in
+ * float32, not a textbook one. (The other section sits at 0.61987.) */
 typedef struct {
     float x1, x2;
     float y1, y2;

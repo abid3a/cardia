@@ -25,14 +25,15 @@ const char *const cardia_class_names[CARDIA_N_CLASSES] = {
 
 static int8_t s_buf_a[SCRATCH_BYTES];
 static int8_t s_buf_b[SCRATCH_BYTES];
-static int8_t s_fused[CARDIA_C3_OUT + CARDIA_N_RR_FEATURES];
+static int8_t s_fused[CARDIA_FUSED_LEN];
+static int8_t s_rr_q[CARDIA_N_RR_FEATURES];
 static int8_t s_fc1_out[CARDIA_FC1_OUT];
 static int32_t s_logits[CARDIA_N_CLASSES];
 
 uint32_t cardia_inference_scratch_bytes(void)
 {
     return (uint32_t)(sizeof(s_buf_a) + sizeof(s_buf_b) + sizeof(s_fused)
-                      + sizeof(s_fc1_out) + sizeof(s_logits));
+                      + sizeof(s_rr_q) + sizeof(s_fc1_out) + sizeof(s_logits));
 }
 
 uint8_t cardia_classify(const float *beat, const float *rr, int32_t *logits)
@@ -85,12 +86,24 @@ uint8_t cardia_classify(const float *beat, const float *rr, int32_t *logits)
                              CARDIA_GAP_MULT, CARDIA_GAP_SHIFT,
                              -128, 127, s_fused);
 
-    /* --- fuse the RR features -------------------------------------------
-     * Quantised with the SAME scale and zero-point as the pooled morphology
-     * features, because the two are concatenated into one int8 vector and a
-     * single tensor cannot carry two scales. */
-    cardia_quantize_f32(rr, CARDIA_N_RR_FEATURES, CARDIA_FUSED_SCALE,
-                        CARDIA_FUSED_ZP, s_fused + CARDIA_C3_OUT);
+    /* --- timing branch ---------------------------------------------------
+     * The four RR features get their own quantisation scale (they live in
+     * [-1, 1] by construction and would waste most of the fused tensor's
+     * range) and their own small projection, whose output is requantised into
+     * the fused scale so the two branches can share one int8 tensor.
+     *
+     * The projection is not decoration. Feeding the four raw features straight
+     * into the fused vector left the network unable to use them: on held-out
+     * validation patients a single threshold on the prematurity feature beat
+     * the whole network's S sensitivity by 60 points. 64 MACs bought that
+     * back. */
+    cardia_quantize_f32(rr, CARDIA_N_RR_FEATURES, CARDIA_RR_IN_SCALE,
+                        CARDIA_RR_IN_ZP, s_rr_q);
+    cardia_fully_connected_s8(s_rr_q, CARDIA_N_RR_FEATURES,
+                              cardia_rrfc_w, cardia_rrfc_b, CARDIA_RR_HIDDEN,
+                              -CARDIA_RR_IN_ZP, CARDIA_FUSED_ZP,
+                              CARDIA_RRFC_MULT, CARDIA_RRFC_SHIFT,
+                              CARDIA_FUSED_ZP, 127, s_fused + CARDIA_C3_OUT);
 
     /* --- fc1 + ReLU ------------------------------------------------------ */
     cardia_fully_connected_s8(s_fused, CARDIA_FUSED_LEN,

@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  host-tests:
+    name: Host unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run unit tests
+        run: make -C tests run
+
+      - name: Build the host simulator
+        run: make -C sim
+
+      # A smoke run on synthetic input, so this job stays fast and needs no
+      # network. The full MIT-BIH parity sweep is a separate, slower job.
+      - name: Simulator smoke test
+        run: |
+          python3 - <<'PY'
+          import math, struct
+          fs, n = 360, 3600
+          out = bytearray()
+          for i in range(n):
+              t = i / fs
+              ph = t - int(t / 0.8) * 0.8
+              v = math.exp(-0.5 * ((ph - 0.10) / 0.008) ** 2)
+              v += 0.25 * math.exp(-0.5 * ((ph - 0.30) / 0.045) ** 2)
+              out += struct.pack('<f', v)
+          open('/tmp/synth.f32', 'wb').write(bytes(out))
+          PY
+          ./sim/build/cardia_sim /tmp/synth.f32
+
+  arm-build:
+    name: STM32F446RE cross-compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install ARM GNU toolchain
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '14.2.Rel1'
+
+      - name: Verify toolchain
+        run: arm-none-eabi-gcc --version
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: python -m pip install --quiet cmake ninja
+
+      - name: Configure
+        run: >
+          cmake -S firmware -B build/arm -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE=cmake/arm-none-eabi.cmake
+          -DCMAKE_BUILD_TYPE=MinSizeRel
+
+      - name: Build
+        run: cmake --build build/arm
+
+      - name: Report size
+        run: arm-none-eabi-size build/arm/cardia.elf
+
+      # A flash or RAM regression should be visible in the PR, not discovered
+      # when the image stops fitting.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cardia-firmware
+          path: |
+            build/arm/cardia.elf
+            build/arm/cardia.bin
+            build/arm/cardia.map
+
+  generated-files:
+    name: Generated files are up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python deps
+        run: python -m pip install --quiet numpy scipy
+
+      # cardia_config.h and filter_coeffs.c are generated from ml/cardia/config.py.
+      # Two implementations of one algorithm drift unless something forces them
+      # together; this job is that something. Editing a constant in Python and
+      # forgetting to regenerate the C cannot reach main.
+      - name: Regenerate and diff
+        run: |
+          python ml/scripts/gen_config_header.py
+          python ml/scripts/gen_filter_coeffs.py
+          python ml/scripts/gen_test_vectors.py
+          git diff --exit-code -- firmware/src/dsp/cardia_config.h \
+                                  firmware/src/dsp/filter_coeffs.c \
+                                  tests/test_vectors.h
+
+  inter-patient-eval:
+    name: MIT-BIH inter-patient evaluation
+    runs-on: ubuntu-latest
+    # Downloads ~200 MB from PhysioNet and trains, so it does not gate every
+    # push. It runs on demand and on main, where the published numbers matter.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python deps
+        run: python -m pip install --quiet -r ml/requirements.txt
+
+      - name: Cache MIT-BIH
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: mitdb-v1
+
+      - name: Download dataset
+        run: python ml/scripts/download_data.py
+
+      # Guards the single most important property of the whole project: no
+      # patient may appear in both the training and the test set.
+      - name: Assert the DS1/DS2 split is patient-disjoint
+        run: |
+          python - <<'PY'
+          import json, sys
+          s = json.load(open('data/cache/summary.json'))
+          overlap = s['patient_overlap']
+          assert not overlap, f"PATIENT LEAKAGE: {overlap}"
+          assert len(s['ds1_patients']) == 22
+          assert len(s['ds2_patients']) == 22
+          assert not (set(s['ds1_patients']) & set(s['ds2_patients']))
+          print("DS1/DS2 disjoint:", len(s['ds1_patients']), "+", len(s['ds2_patients']))
+          PY
+
+      - name: Train
+        run: python ml/scripts/run_train.py --float-epochs 40 --qat-epochs 18
+
+      - name: Export to C and check the integer path
+        run: python ml/scripts/export_model.py
+
+      - name: Host/target numerical parity over DS2
+        run: |
+          make -C sim
+          python sim/run_sim.py --records ds2
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-artifacts
+          path: ml/artifacts/
